@@ -66,16 +66,20 @@ function CameraRig() {
 */
 function Scene() {
     // RESTORED: Using useState for the light position, as you originally had.
-    const [lightPosition, setLightPosition] = useState(new Vector3(0, .5, 0));
+    const [lightPosition, setLightPosition] = useState(new Vector3(1, .5, 1.5));
     const cubeGroupRef = useRef<Group>(null!);
     
     const materialProps = useControls("Glass Material", {
-    thickness: { value: 0.2, min: 0, max: 3, step: 0.05 },
-    roughness: { value: 0.05, min: 0, max: 1, step: 0.01 },
-    color: "#ffffff",
+    anisotropy: { value: 0.1, min: 0, max: 1, step: 0.01 },
+    distortion: { value: 0.0, min: 0, max: 1, step: 0.01 },
+    distortionScale: { value: 0.1, min: 0.01, max: 1, step: 0.01 },
+    temporalDistortion: { value: 0.0, min: 0, max: 1, step: 0.01 },
+    iridescence: { value: 1, min: 0, max: 1, step: 0.01 },
+    iridescenceIOR: { value: 1, min: 1, max: 2.333, step: 0.01 },
+    iridescenceThicknessRange: { value: [100, 400], min: 0, max: 1000 },
     "Save Material": button((get) => {
-        const { color, ...rest } = get("Glass Material");
-        const materialState = { color: `#${new Color(color).getHexString()}`, ...rest };
+        const { anisotropy, ...rest } = get("Glass Material");
+        const materialState = {...rest };
         delete materialState["Save Material"];
         const stateString = JSON.stringify(materialState, null, 2);
         navigator.clipboard.writeText(stateString);
@@ -103,22 +107,22 @@ useThree(({camera}) => {
       {/* <CameraRig /> */}
       <SoftShadows size={80} focus={0.4} samples={30} />
       <Environment preset="studio" />
-      {/* <ambientLight intensity={1.5} color="#ffffff" /> */}
-      {/* <spotLight
+      <ambientLight intensity={1.5} color="#ffffff" />
+      <spotLight
         castShadow
         position={[0, 5, 0]}
-        intensity={80}
+        intensity={40}
         distance={10}
-        decay={2}
+        decay={1}
         color="#ffffff"
         angle={Math.PI / 6}
-        penumbra={0.5}
-      /> */}
-      {/* The interactive light now correctly uses the state variable for its position */}
+        penumbra={1}
+      />
+
       <spotLight
         castShadow
         position={lightPosition}
-        intensity={90}
+        intensity={200}
         distance={8}
         decay={2}
         color="#ffffff"
@@ -132,7 +136,7 @@ useThree(({camera}) => {
         </mesh>
         <mesh receiveShadow>
           <boxGeometry args={[1, 1, 1]} />
-          <MeshTransmissionMaterial {...materialProps} thickness={0.2} roughness={0.15} transmission={1} chromaticAberration={1} ior={2}/>
+          <MeshTransmissionMaterial {...materialProps} anisotropy={1} distortion={0.4} distortionScale={0.63} temporalDistortion={0.07} iridescence={1} iridescenceIOR={2.33} color="#ffffff" thickness={0.2} roughness={0.15} transmission={1} chromaticAberration={1} ior={2}/>
         </mesh>
       </group>
       <mesh
@@ -161,7 +165,7 @@ export default function HomePage() {
         background: "linear-gradient(to bottom, #d3d3d3, #f5f5f5)",
       }}
     >
-      <Canvas shadows camera={{position: [4, 3.5, -3], fov: 31}}>
+      <Canvas shadows camera={{position: [4, 3.5, -3], fov: 30}}>
         <Scene />
       </Canvas>
     </main>
