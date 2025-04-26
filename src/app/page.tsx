@@ -1,103 +1,107 @@
-import Image from "next/image";
+// app/page.tsx
 
-export default function Home() {
+"use client"; // This is essential for using React hooks and event listeners in Next.js App Router
+
+import { useState, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { SoftShadows } from "@react-three/drei";
+import { Vector3, Mesh } from "three";
+
+/**
+ * This is the main component containing our 3D scene logic.
+ * It's kept separate from the Page component for better organization.
+ */
+function Scene() {
+  // State to hold the position of our interactive light
+  // We initialize it off-screen until the mouse moves over the canvas
+  const [lightPosition, setLightPosition] = useState(new Vector3(0, 5, 0));
+
+  // A ref to the cube mesh to make it rotate
+  const cubeRef = useRef<Mesh>(null!);
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      {/* 
+        SoftShadows from drei is a helper that makes shadows look much better.
+        'size' controls the blurriness/fuzziness.
+        'focus' helps maintain sharpness near the shadow caster.
+        'samples' improves the quality.
+      */}
+      <SoftShadows size={35} focus={0.9} samples={24} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      {/* Ambient light to illuminate the whole scene faintly.
+          This ensures that the parts of the cube not hit by the main light are not pitch black.
+          The color is a light gray. */}
+      <ambientLight intensity={2} color="#ffffff" />
+
+      {/* This is our interactive light. It's a PointLight, which emits light from a single point.
+          - 'castShadow' is crucial for it to create shadows.
+          - 'position' is controlled by the mouse movement.
+          - 'intensity' is how bright the light is.
+          - 'distance' and 'decay' make the light fade out over distance, as requested.
+      */}
+      <pointLight
+        castShadow
+        position={lightPosition}
+        intensity={90}
+        distance={4}
+        decay={4}
+        color="#ffffff"
+      />
+
+      {/* This is the central cube. */}
+      <mesh ref={cubeRef} position={[0, 0.45, 0]} receiveShadow castShadow>
+        <boxGeometry args={[1, 1, 1]} />
+        {/* 
+          meshStandardMaterial is a physically based material that reacts to light realistically.
+          - 'color' is a light beige/gray, like cardboard.
+          - 'roughness' makes the surface non-glossy (a high value means less reflective).
+          - 'metalness' is set to 0 for a non-metallic look.
+        */}
+        <meshStandardMaterial color="#f2e9d8" roughness={0.5} metalness={1} />
+      </mesh>
+
+      {/* This is the ground plane. It needs to be large enough to catch the shadow. */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate it to be flat
+        position={[0, 0, 0]}
+        receiveShadow // This allows the plane to have shadows cast upon it.
+        // We add the onPointerMove event here. It's the most efficient way to track the cursor in 3D space.
+        // The event 'e.point' gives us the exact 3D coordinate where the cursor intersects with this mesh.
+        onPointerMove={(e) => {
+          // We update the light's position based on the cursor's intersection point on the plane.
+          // We keep the light's height (Y-axis) constant at 2.5 units above the plane.
+          setLightPosition(new Vector3(e.point.x, 2.5, e.point.z));
+        }}
+      >
+        <planeGeometry args={[20, 20]} />
+        <meshStandardMaterial color="#e0e0e0" roughness={0.5} />
+      </mesh>
+    </>
+  );
+}
+
+/**
+ * This is the main page component exported for Next.js.
+ */
+export default function HomePage() {
+  return (
+    <main
+      style={{
+        height: "100vh",
+        width: "100vw",
+        background: "linear-gradient(to bottom, #d3d3d3, #f5f5f5)",
+      }}
+    >
+      {/* 
+        The Canvas component is the root of our 3D scene.
+        - 'shadows' enables shadow mapping in the renderer.
+        - 'camera' sets the initial properties of the camera.
+          - 'position' is set as requested: 45 degrees above and slightly to the side.
+          - 'fov' (Field of View) controls the zoom level.
+      */}
+      <Canvas shadows camera={{ position: [3, 3, 3], fov: 30 }}>
+        <Scene />
+      </Canvas>
+    </main>
   );
 }
