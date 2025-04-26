@@ -1,60 +1,120 @@
 // app/page.tsx
 
-"use client"; // This is essential for using React hooks and event listeners in Next.js App Router
+"use client";
 
 import { useState, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { SoftShadows } from "@react-three/drei";
-import { Vector3, Group, MathUtils } from "three";
+import {
+  SoftShadows,
+  MeshTransmissionMaterial,
+  Environment,
+} from "@react-three/drei";
+// FIX: Import specific types from 'three' to help TypeScript
+import { Vector3, Group, Color, PerspectiveCamera } from "three";
+import { useControls, button } from "leva";
+import {
+  EffectComposer,
+  Bloom,
+  DepthOfField,
+  SSAO,
+  Vignette,
+} from "@react-three/postprocessing";
+
+/**
+ * A dedicated component to control the camera with Leva.
+ */
+function CameraRig() {
+  const { camera } = useThree();
+
+  useControls("Camera", () => ({
+    position: {
+      value: [4, 1.5, 5],
+      step: 0.1,
+      onChange: (v) => camera.position.set(v[0], v[1], v[2]),
+    },
+    fov: {
+      value: 35,
+      min: 10,
+      max: 120,
+      onChange: (v) => {
+        // FIX: Check if the camera is a PerspectiveCamera before accessing 'fov'
+        if (camera instanceof PerspectiveCamera) {
+          camera.fov = v;
+          camera.updateProjectionMatrix();
+        }
+      },
+    },
+    "Save Camera": button(() => {
+      // FIX: Check if the camera is a PerspectiveCamera before accessing 'fov'
+      if (camera instanceof PerspectiveCamera) {
+        const { x, y, z } = camera.position;
+        const cameraState = { position: [x, y, z], fov: camera.fov };
+        const stateString = JSON.stringify(cameraState, null, 2);
+        navigator.clipboard.writeText(stateString);
+        alert("Camera state copied to clipboard!");
+      }
+    }),
+  }));
+
+  return useFrame(() => {
+    camera.lookAt(0, -3.5, 0);
+  });
+}
 
 /**
  * This is the main component containing our 3D scene logic.
- * It's kept separate from the Page component for better organization.
- */
+*/
 function Scene() {
-  // State to hold the position of our interactive light
-  const [lightPosition, setLightPosition] = useState(new Vector3(-0.5, 0.5, 2.9));
+    // RESTORED: Using useState for the light position, as you originally had.
+    const [lightPosition, setLightPosition] = useState(new Vector3(0, .5, 0));
+    const cubeGroupRef = useRef<Group>(null!);
+    
+    const materialProps = useControls("Glass Material", {
+    thickness: { value: 0.2, min: 0, max: 3, step: 0.05 },
+    roughness: { value: 0.05, min: 0, max: 1, step: 0.01 },
+    color: "#ffffff",
+    "Save Material": button((get) => {
+        const { color, ...rest } = get("Glass Material");
+        const materialState = { color: `#${new Color(color).getHexString()}`, ...rest };
+        delete materialState["Save Material"];
+        const stateString = JSON.stringify(materialState, null, 2);
+        navigator.clipboard.writeText(stateString);
+        alert("Material state copied to clipboard!");
+    }),
+});
 
-  // A ref to the group containing both cube meshes to rotate them together
-  const cubeGroupRef = useRef<Group>(null!);
+const groundProps = useControls("Ground Plane", {
+    color: "#ffffff",
+    roughness: { value: 0.2, min: 0, max: 1 },
+    metalness: { value: 0.5, min: 0, max: 1 },
+});
 
-  // useFrame is a hook that runs on every rendered frame to add rotation
-  useFrame((state, delta) => {
+useFrame((state, delta) => {
     if (cubeGroupRef.current) {
-      cubeGroupRef.current.rotation.y += delta * 0.1;
+        cubeGroupRef.current.rotation.y += delta * 0;
     }
-  });
-  useThree(({ camera }) => {
-    // camera.rotation.set(MathUtils.degToRad(-100), MathUtils.degToRad(2), 0);
-    console.log(camera.rotation)
-  });
+});
 
+useThree(({camera}) => {
+    camera.lookAt(0, -0.5, 0);
+  });
   return (
     <>
-      {/* 
-        SoftShadows from drei is a helper that makes shadows look much better.
-        'size' controls the blurriness/fuzziness.
-        'focus' helps maintain sharpness near the shadow caster.
-        'samples' improves the quality.
-      */}
+      {/* <CameraRig /> */}
       <SoftShadows size={80} focus={0.4} samples={30} />
-
-      {/* 
-        Ambient light to illuminate the whole scene faintly.
-        The intensity is high enough to make sure the cube is never black.
-        The color is a neutral white.
-      />
-      */}    
-      <ambientLight intensity={1.5} color="#ffffff" />
-
-      {/* 
-        NEW: We now use a SpotLight for a more "diffused" effect.
-        A spotlight creates a cone of light, which we can soften.
-        - 'penumbra' creates the soft edge on the light cone. A value of 1 is maximum softness.
-        - 'angle' controls how wide the cone is.
-        - It still casts a shadow and fades with distance and decay.
-        - We also give it a target. By default, it targets [0,0,0], which is perfect.
-      */}
+      <Environment preset="studio" />
+      {/* <ambientLight intensity={1.5} color="#ffffff" /> */}
+      {/* <spotLight
+        castShadow
+        position={[0, 5, 0]}
+        intensity={80}
+        distance={10}
+        decay={2}
+        color="#ffffff"
+        angle={Math.PI / 6}
+        penumbra={0.5}
+      /> */}
+      {/* The interactive light now correctly uses the state variable for its position */}
       <spotLight
         castShadow
         position={lightPosition}
@@ -62,97 +122,36 @@ function Scene() {
         distance={8}
         decay={2}
         color="#ffffff"
-        angle={Math.PI / 6} // A 45-degree cone angle
-        penumbra={1} // Maximum softness for the edge
+        angle={Math.PI / 6}
+        penumbra={1}
       />
-      {/* <spotLight
-        castShadow
-        position={new Vector3(-0.5, 0.5, 2.9)}
-        intensity={40}
-        distance={8}
-        decay={2}
-        color="#ffffff"
-        angle={Math.PI / 6} // A 45-degree cone angle
-        penumbra={1} // Maximum softness for the edge
-      /> */}
-
-
-        <spotLight
-        castShadow
-        position={new Vector3(0, 5, 0)}
-        intensity={80}
-        distance={100}
-        decay={2}
-        color="#ffffff"
-        angle={Math.PI / 6} // A 45-degree cone angle
-        penumbra={0.5} // Maximum softness for the edge
-      />
-      
-
-      {/* 
-        NEW: We use a <group> to hold two cube meshes.
-        This allows us to position and rotate them as a single unit.
-        This is the key to having a transparent object that also casts a shadow.
-      */}
       <group ref={cubeGroupRef} position={[0, 0.5, 0]}>
-        {/* 
-          MESH 1: THE SHADOW CASTER (INVISIBLE)
-          This mesh's only job is to cast a shadow. It's not visible to the camera.
-          We make it invisible by using a material that doesn't write to the color buffer.
-          It MUST have castShadow={true}.
-        */}
         <mesh castShadow>
           <boxGeometry args={[1, 1, 1]} />
           <meshBasicMaterial color="black" colorWrite={false} depthWrite={false} />
         </mesh>
-
-        {/* 
-          MESH 2: THE VISUAL CUBE (TRANSPARENT & REFRACTIVE)
-          This is the cube the user actually sees.
-          It does NOT cast a shadow, because transparent objects let light pass through them.
-        */}
         <mesh receiveShadow>
           <boxGeometry args={[1, 1, 1]} />
-          {/* 
-            NEW: We use meshPhysicalMaterial for advanced effects like transparency and refraction.
-            - 'metalness' is now 0.1. This is THE FIX for the ambient light issue. Non-metallic objects are affected by ambient light.
-            - 'roughness' controls how "frosted" the glass is. 0 is clear, 1 is fully frosted.
-            - 'transmission' is the key property for transparency/refraction. 1 means 100% of light passes through.
-            - 'thickness' affects the amount of refractive distortion.
-          */}
-          <meshPhysicalMaterial
-            color="#f2e9d8"
-            metalness={0}
-            roughness={0}
-            transmission={1}
-            thickness={0.1}
-            dispersion={1}
-            iridescence={1}
-          />
+          <MeshTransmissionMaterial {...materialProps} thickness={0.2} roughness={0.15} transmission={1} chromaticAberration={1} ior={2}/>
         </mesh>
       </group>
-
-      {/* This is the ground plane. It needs to be large enough to catch the shadow. */}
       <mesh
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate it to be flat
-        position={[0, -0.01, 0]} // Lowered slightly to prevent visual artifacts with the cube
-        receiveShadow // This allows the plane to have shadows cast upon it.
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.01, 0]}
+        receiveShadow
+        // RESTORED: The onPointerMove event handler updates the state.
         onPointerMove={(e) => {
-          // We update the light's position based on the cursor's intersection point on the plane.
-          // We keep the light's height (Y-axis) constant.
           setLightPosition(new Vector3(e.point.x, 1.5, e.point.z));
         }}
       >
         <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial color="#e0e0e0" roughness={0.5} />
+        <meshStandardMaterial color="#727272" roughness={0.13} metalness={0.38} />
       </mesh>
+
     </>
   );
 }
 
-/**
- * This is the main page component exported for Next.js.
- */
 export default function HomePage() {
   return (
     <main
@@ -162,14 +161,7 @@ export default function HomePage() {
         background: "linear-gradient(to bottom, #d3d3d3, #f5f5f5)",
       }}
     >
-      {/* 
-        The Canvas component is the root of our 3D scene.
-        - 'shadows' enables shadow mapping in the renderer.
-        - 'camera' sets the initial properties of the camera.
-          - 'position' is set as requested: 45 degrees above and slightly to the side.
-          - 'fov' (Field of View) controls the zoom level.
-      */}
-      <Canvas shadows camera={{ position: [3, 3, 3], fov: 30 }}>
+      <Canvas shadows camera={{position: [4, 3.5, -3], fov: 31}}>
         <Scene />
       </Canvas>
     </main>
