@@ -12,11 +12,14 @@ import {
 import { Vector3, Group } from "three";
 import {
   EffectComposer,
-  Bloom,
+  Autofocus,
   DepthOfField,
   SSAO,
+  ChromaticAberration,
   Vignette,
 } from "@react-three/postprocessing";
+import { BlendFunction } from "postprocessing";
+// import * as rtpp from "@react-three/postprocessing";
 import { HeroSurround } from "./HeroSurround"; // Make sure the path is correct
 
 // --- Your existing Scene component and other helpers go here ---
@@ -58,9 +61,9 @@ function Scene() {
       <spotLight
         castShadow
         position={lightPosition}
-        intensity={300}
+        intensity={80}
         distance={8}
-        decay={2}
+        decay={1}
         color="#ffffff"
         angle={Math.PI / 6}
         penumbra={1}
@@ -108,6 +111,19 @@ function Scene() {
           metalness={0.38}
         />
       </mesh>
+      <EffectComposer>
+        <DepthOfField
+          focusDistance={0}
+          focalLength={0.1}
+          bokehScale={4}
+          height={480}
+        />
+        <Vignette eskil={false} offset={0.1} darkness={0.5} />
+        <ChromaticAberration
+          blendFunction={BlendFunction.NORMAL}
+          offset={[0.002, 0.0002]} // color offset
+        />
+      </EffectComposer>
     </>
   );
 }
