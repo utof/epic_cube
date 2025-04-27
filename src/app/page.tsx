@@ -9,9 +9,7 @@ import {
   MeshTransmissionMaterial,
   Environment,
 } from "@react-three/drei";
-// FIX: Import specific types from 'three' to help TypeScript
-import { Vector3, Group, Color, PerspectiveCamera } from "three";
-import { useControls, button } from "leva";
+import { Vector3, Group } from "three";
 import {
   EffectComposer,
   Bloom,
@@ -19,125 +17,57 @@ import {
   SSAO,
   Vignette,
 } from "@react-three/postprocessing";
-import { HeroSurround } from "./HeroSurround";
+import { HeroSurround } from "./HeroSurround"; // Make sure the path is correct
 
-/**
- * A dedicated component to control the camera with Leva.
- */
-function CameraRig() {
-  const { camera } = useThree();
-
-  useControls("Camera", () => ({
-    position: {
-      value: [4, 1.5, 5],
-      step: 0.1,
-      onChange: (v) => camera.position.set(v[0], v[1], v[2]),
-    },
-    fov: {
-      value: 35,
-      min: 10,
-      max: 120,
-      onChange: (v) => {
-        // FIX: Check if the camera is a PerspectiveCamera before accessing 'fov'
-        if (camera instanceof PerspectiveCamera) {
-          camera.fov = v;
-          camera.updateProjectionMatrix();
-        }
-      },
-    },
-    "Save Camera": button(() => {
-      // FIX: Check if the camera is a PerspectiveCamera before accessing 'fov'
-      if (camera instanceof PerspectiveCamera) {
-        const { x, y, z } = camera.position;
-        const cameraState = { position: [x, y, z], fov: camera.fov };
-        const stateString = JSON.stringify(cameraState, null, 2);
-        navigator.clipboard.writeText(stateString);
-        alert("Camera state copied to clipboard!");
-      }
-    }),
-  }));
-
-  return useFrame(() => {
-    camera.lookAt(0, -3.5, 0);
-  });
-}
-
-/**
- * This is the main component containing our 3D scene logic.
- */
+// --- Your existing Scene component and other helpers go here ---
+// (No changes needed for the Scene component itself)
 function Scene() {
-  // RESTORED: Using useState for the light position, as you originally had.
   const [lightPosition, setLightPosition] = useState(
     new Vector3(-1.7, 2.8, 1.5)
   );
   const cubeGroupRef = useRef<Group>(null!);
 
-  const materialProps = useControls("Glass Material", {
-    anisotropy: { value: 0.1, min: 0, max: 1, step: 0.01 },
-    distortion: { value: 0.0, min: 0, max: 1, step: 0.01 },
-    distortionScale: { value: 0.1, min: 0.01, max: 1, step: 0.01 },
-    temporalDistortion: { value: 0.0, min: 0, max: 1, step: 0.01 },
-    iridescence: { value: 1, min: 0, max: 1, step: 0.01 },
-    iridescenceIOR: { value: 1, min: 1, max: 2.333, step: 0.01 },
-    iridescenceThicknessRange: { value: [100, 400], min: 0, max: 1000 },
-    "Save Material": button((get) => {
-      const { anisotropy, ...rest } = get("Glass Material");
-      const materialState = { ...rest };
-      delete materialState["Save Material"];
-      const stateString = JSON.stringify(materialState, null, 2);
-      navigator.clipboard.writeText(stateString);
-      alert("Material state copied to clipboard!");
-    }),
+  useFrame((state, delta) => {
+    if (cubeGroupRef.current) {
+      // A little bit of rotation to make it feel alive
+      cubeGroupRef.current.rotation.y += delta * 0.2;
+    }
   });
-
-  const groundProps = useControls("Ground Plane", {
-    color: "#ffffff",
-    roughness: { value: 0.2, min: 0, max: 1 },
-    metalness: { value: 0.5, min: 0, max: 1 },
-  });
-
-  //   useFrame((state, delta) => {
-  //     if (cubeGroupRef.current) {
-  //       cubeGroupRef.current.rotation.y += delta * 0;
-  //     }
-  //   });
-
   useThree(({ camera }) => {
-    camera.lookAt(0, -0.5, -0.1);
+    camera.lookAt(0, 0.25, 0);
     // if (cubeGroupRef.current) {
     //     cubeGroupRef.current.rotation.y = 20;
     // }
   });
+
   return (
     <>
-      {/* <CameraRig /> */}
       <SoftShadows size={80} focus={0.4} samples={30} />
       <Environment preset="studio" />
       <ambientLight intensity={1.5} color="#ffffff" />
       <spotLight
         castShadow
-        position={[0, 5, 0]}
+        position={[0, 2.5, 0]}
         intensity={40}
-        distance={10}
+        distance={100}
         decay={1}
         color="#ffffff"
-        angle={Math.PI / 6}
+        angle={Math.PI / 5}
         penumbra={1}
       />
-
       <spotLight
         castShadow
         position={lightPosition}
-        intensity={200}
+        intensity={300}
         distance={8}
         decay={2}
         color="#ffffff"
         angle={Math.PI / 6}
         penumbra={1}
       />
-      <group ref={cubeGroupRef} position={[0, 0.5, 0]} rotation={[0, 3, 0]}>
+      <group ref={cubeGroupRef} position={[0, 0.25, 0]}>
         <mesh castShadow>
-          <boxGeometry args={[1, 1, 1]} />
+          <boxGeometry args={[0.5, 0.5, 0.5]} />
           <meshBasicMaterial
             color="black"
             colorWrite={false}
@@ -145,9 +75,8 @@ function Scene() {
           />
         </mesh>
         <mesh receiveShadow>
-          <boxGeometry args={[1, 1, 1]} />
+          <boxGeometry args={[0.5, 0.5, 0.5]} />
           <MeshTransmissionMaterial
-            {...materialProps}
             anisotropy={1}
             distortion={0.4}
             distortionScale={0.63}
@@ -167,12 +96,12 @@ function Scene() {
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.01, 0]}
         receiveShadow
-        // RESTORED: The onPointerMove event handler updates the state.
         onPointerMove={(e) => {
-          setLightPosition(new Vector3(e.point.x, 2.5, e.point.z));
+          // This will now work because of `pointer-events-none` on the overlay!
+          setLightPosition(new Vector3(e.point.x, 0.5, e.point.z));
         }}
       >
-        <planeGeometry args={[20, 20]} />
+        <planeGeometry args={[30, 30]} />
         <meshStandardMaterial
           color="#727272"
           roughness={0.13}
@@ -183,18 +112,54 @@ function Scene() {
   );
 }
 
+// A placeholder for your shadcn/ui CTA button
+const CallToAction = () => (
+  // You can use your actual shadcn Button here
+  <button
+    className="w-full px-6 py-3 bg-black text-white text-lg md:text-xl font-bold hover:bg-neutral-800 transition-colors"
+    onClick={() => alert("sold out sori bro")}
+  >
+    Gimme dat
+  </button>
+);
+
 export default function HomePage() {
+  // State to hold the calculated parallax offset
+  const [parallaxOffset, setParallaxOffset] = useState({ x: 0, y: 0 });
+
+  // This function calculates the parallax effect based on mouse position
+  const handleMouseMove = (event: React.MouseEvent<HTMLElement>) => {
+    const { clientX, clientY, currentTarget } = event;
+    const { offsetWidth, offsetHeight } = currentTarget;
+
+    // Calculate mouse position from the center of the screen (-1 to 1)
+    const x = (clientX / offsetWidth - 0.5) * 2;
+    const y = (clientY / offsetHeight - 0.5) * 2;
+
+    // Define the maximum movement distance for the parallax effect
+    const maxOffset = 1; // pixels
+
+    setParallaxOffset({
+      x: -x * maxOffset, // Invert for a natural parallax feel
+      y: -y * maxOffset,
+    });
+  };
+
   return (
+    // We add the onMouseMove handler to the main container
     <main
-      style={{
-        height: "100vh",
-        width: "100vw",
-        background: "linear-gradient(to bottom, #d3d3d3, #f5f5f5)",
-      }}
+      className="relative h-screen w-screen overflow-hidden bg-[#dbe0e7]"
+      onMouseMove={handleMouseMove}
     >
-      <Canvas shadows camera={{ position: [4.5, 3.5, -3.5], fov: 30 }}>
+      <Canvas
+        shadows
+        camera={{ position: [0, 2, 6], fov: 20 }} // Adjusted camera for better framing
+        className="h-full w-full"
+      >
         <Scene />
       </Canvas>
+
+      <HeroSurround cta={<CallToAction />} parallaxOffset={parallaxOffset} />
     </main>
   );
 }
